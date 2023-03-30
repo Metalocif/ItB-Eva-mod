@@ -8,14 +8,24 @@ local iconPath = path .."img/weapons/"
 local files = {
 	"EVA_ProgKnife.png",
 	-- "EVA_SniperRifle.png",
-	-- "EVA_NeedleRack.png",
+	"EVA_NeedleRacks.png",
 	"EVA_SonicGlaive.png",
 	-- "EVA_LonginusSpear.png"
+	"EVA_PositronRifle.png",
+	-- "EVA_HeavySword.png" the EVA series' weapon
 }
 
 -- iterate our files and add the assets so the game can find them.
 for _, file in ipairs(files) do
 	modApi:appendAsset("img/weapons/".. file, iconPath .. file)
+end
+
+local effects = {
+	"needle_R.png",
+	"needle_U.png",
+}
+for _, effect in ipairs(effects) do
+	modApi:appendAsset("img/effects/".. effect, path .. "img/effects/" .. effect)
 end
 
 --EVA weapons are massively overpowered because Angels are massively overpowered.
@@ -118,7 +128,7 @@ function EVA_ProgKnife:GetFinalEffect(p1,p2,p3)
 		if animNumber <= 3 then
 			damage.sAnimation="explospear"..animNumber.."_"..direction
 		else
-			damage.sAnimation="explosword"..direction
+			damage.sAnimation="explosword_"..direction
 		end
 		ret:AddMelee(p2 - DIR_VECTORS[direction], damage)
 		ret:AddDelay(0.2)
@@ -129,7 +139,7 @@ function EVA_ProgKnife:GetFinalEffect(p1,p2,p3)
 		if animNumber <= 3 then
 			damage.sAnimation="explospear"..animNumber.."_"..direction
 		else
-			damage.sAnimation="explosword"..direction
+			damage.sAnimation="explosword_"..direction
 		end
 		ret:AddMelee(p3 - DIR_VECTORS[direction], damage)
 		ret:AddDelay(0.2)
@@ -249,7 +259,7 @@ EVA_SniperRifle = Brute_Sniper:new{
 	PowerCost = 0, --AE Change
 	ProjectileArt = "effects/shot_sniper",
 	Damage = 2, -- for tooltip
-	Push = 0,
+	Push = true,
 	MaxDamage = 4,
 	MinDamage = 2,
 	Upgrades = 2,
@@ -303,3 +313,163 @@ Brute_Sniper_AB = Brute_Sniper:new{
 		Target = Point(2,1),
 	},
 }
+
+function Brute_Sniper:GetSkillEffect(p1,p2)
+	local ret = SkillEffect()
+	local dir = GetDirection(p2 - p1)
+	
+	local counter = p1 + DIR_VECTORS[dir]
+	local dist = 0
+	
+	local target = GetProjectileEnd(p1,p2,PATH_PROJECTILE)  
+	
+	while counter ~= target  and  dist ~= 8 do 
+		dist = dist + 1
+		counter = counter + DIR_VECTORS[dir]
+	end
+	
+	
+	local damage = SpaceDamage(target, math.min(self.MaxDamage, self.MinDamage + dist), dir)
+	damage.sAnimation = "explopush1_"..dir
+	ret:AddProjectile(damage, self.ProjectileArt, NO_DELAY)
+
+	--ret.path = Board:GetSimplePath(p1, target)
+	
+	return ret
+end
+
+----------------
+--Needle Racks--
+----------------
+
+
+EVA_NeedleRacks = Skill:new{
+	Name = "Needle Racks",	--ideally, this should have an emitter to drop casings on the ground
+	Description = "Fire a short-range projectile as a free action, pushing the target.",
+	Class = "TechnoVek",
+	Icon = "weapons/EVA_NeedleRacks.png",
+	PowerCost = 0, --AE Change
+	ProjectileArt = "effects/needle",
+	Damage = 1, -- for tooltip
+	Push = true,
+	Upgrades = 2,
+	Range = 2,
+	Limited = 2,
+	Explosion = "",
+	UpgradeCost = {1,2}, --AE Change 1,1
+	UpgradeList = { "+1 Damage",  "+1 Use"  },
+	LaunchSound = "/weapons/raining_volley",
+	ImpactSound = "/impact/generic/explosion",
+	TipImage = {
+		Unit = Point(2,3),
+		Enemy = Point(2,1),
+		Target = Point(2,1),
+		Second_Origin = Point(2,3),
+		Second_Target = Point(2,1)
+	},
+	ZoneTargeting = ZONE_DIR,
+}
+
+EVA_NeedleRacks_A = EVA_NeedleRacks:new{
+	UpgradeDescription = "Increases damage by 1.",
+	Damage = 2,
+}
+
+EVA_NeedleRacks_B = EVA_NeedleRacks:new{
+	UpgradeDescription = "Can be used one more time.",
+	Limited = 3,
+}
+			
+EVA_NeedleRacks_AB = EVA_NeedleRacks:new{
+	Damage = 2,
+	Limited = 3,
+}
+
+function EVA_NeedleRacks:GetTargetArea(point)
+	local ret = PointList()
+	for i = DIR_START, DIR_END do
+		for k = 1, self.Range do
+			local curr = DIR_VECTORS[i] * k + point
+			if not Board:IsValid(curr) then break end
+			ret:push_back(curr)
+			if Board:IsBlocked(curr, PATH_PROJECTILE) then break end
+		end
+	end
+	return ret
+end
+
+function EVA_NeedleRacks:GetSkillEffect(p1, p2)
+	local ret = SkillEffect()
+	local direction = GetDirection(p2 - p1)
+	local damage = SpaceDamage(p2, self.Damage, direction)
+	damage.sScript = string.format("Board:GetPawn(%s):SetActive(true)",Board:GetPawn(p1):GetId())    
+	ret:AddProjectile(p1, damage,self.ProjectileArt,NO_DELAY)
+	return ret
+end	
+
+------------------
+--Positron Rifle--
+------------------
+
+
+EVA_PositronRifle = Laser_Base:new{
+	Name = "Positron Rifle",
+	Description = "Channel the power of the grid into a particle accelerator, firing a beam of antimatter. Costs Grid when fired, and can only be fired adjacent to a building.",
+	Class = "TechnoVek",
+	Icon = "weapons/EVA_PositronRifle.png",
+	PowerCost = 0, --AE Change
+	ProjectileArt = "effects/needle",
+	Damage = 10, -- for tooltip
+	Push = false,
+	Upgrades = 0,
+	Explosion = "",
+	--UpgradeCost = {1,2}, 
+	--UpgradeList = { "+1 Damage",  "+1 Use"  },	--maybe take into account grid DEF as an upgrade?
+	LaunchSound = "/weapons/raining_volley",
+	ImpactSound = "/impact/generic/explosion",
+	TipImage = {
+		Unit = Point(2,3),
+		Enemy = Point(2,1),
+		Target = Point(2,1),
+		Second_Origin = Point(2,3),
+		Second_Target = Point(2,1)
+	},
+	ZoneTargeting = ZONE_DIR,
+}
+
+function EVA_PositronRifle:GetTargetArea(point)
+	--LaserBase with a check for building adjacency and grid power level
+	local ret = PointList()
+	local GridAdjacent
+	for dir = DIR_START, DIR_END do
+		curr = point + DIR_VECTORS[dir]
+		if Board:GetTerrain(curr) == TERRAIN_BUILDING and (Board:IsPowered(curr) or not Board:GetPawn(curr):IsNonGridStructure()) then 
+			GridAdjacent = true 
+			LOG("good")
+		end
+	end
+	if GridAdjacent then LOG("close to grid") end
+	if not GridAdjacent or Game:GetPower():GetValue() == 1 then return ret end
+	for dir = DIR_START, DIR_END do
+		local curr = point + DIR_VECTORS[dir]
+		while Board:GetTerrain(curr) ~= TERRAIN_MOUNTAIN and not Board:IsBuilding(curr) and Board:IsValid(curr) do
+			ret:push_back(curr)
+			curr = curr + DIR_VECTORS[dir]
+		end
+		
+		if Board:IsValid(curr) then
+			ret:push_back(curr)
+		end
+	end
+	return ret
+end
+
+function EVA_PositronRifle:GetSkillEffect(p1,p2)
+	local ret = SkillEffect()
+	local direction = GetDirection(p2 - p1)
+	local target = p1 + DIR_VECTORS[direction]
+	
+	self:AddLaser(ret, target, direction)
+	ret:AddScript("Game:ModifyPowerGrid(-1)")
+	return ret
+end

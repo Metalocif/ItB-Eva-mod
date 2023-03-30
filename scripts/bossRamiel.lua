@@ -44,8 +44,22 @@ local baseEmerge = a.BaseEmerge:new{Image = "units/aliens/EVA_RamielBoss_emerge.
 
 a.EVA_RamielBoss = base
 a.EVA_RamielBosse = baseEmerge
-a.EVA_RamielBossa = base:new{ Image = "units/aliens/EVA_RamielBossa.png", NumFrames = 11, PosX = -23, PosY = -16, Height = 1 }
+a.EVA_RamielBossa = base:new{ Image = "units/aliens/EVA_RamielBossa.png", NumFrames = 12, PosX = -23, PosY = -16, Height = 1 }
 a.EVA_RamielBossd = base:new{ Image = "units/aliens/EVA_RamielBoss_death.png", Loop = false, NumFrames = 10, Time = .15, Height = 1 }
+
+local effects = {
+	"ramiellaser_hit.png",
+	"ramiellaser_R.png",
+	"ramiellaser_R1.png",
+	"ramiellaser_R2.png",
+	"ramiellaser_start.png",
+	"ramiellaser_U.png",
+	"ramiellaser_U1.png",
+	"ramiellaser_U2.png",
+}
+for _, effect in ipairs(effects) do
+	modApi:appendAsset("img/effects/".. effect, resourcePath .. "img/effects/" .. effect)
+end
 
 EVA_RamielBossAtk1 = LaserDefault:new{
 	Name = "Particle Beam",
@@ -54,9 +68,10 @@ EVA_RamielBossAtk1 = LaserDefault:new{
 	Class = "Enemy",
 	PathSize = 1,
 	Damage = 5,
-	MinDamage=5,	
+	MinDamage= 5,	
 	Push = 0,
-	TipImage = {
+	LaserArt = "effects/ramiellaser",
+	TipImage = {			--add shields to preview
 		CustomPawn = "EVA_RamielBoss",
 		Unit = Point(2,2),
 		Enemy = Point(2,1),
@@ -66,7 +81,8 @@ EVA_RamielBossAtk1 = LaserDefault:new{
 }
 
 function EVA_RamielBossAtk1:AddLaser(ret,point,direction,queued,forced_end)
-	local queued = queued or false
+	-- local queued = queued or false
+	local queued = true
 	local minDamage = self.MinDamage or 1
 	local damage = self.Damage
 	local start = point - DIR_VECTORS[direction]
@@ -74,7 +90,6 @@ function EVA_RamielBossAtk1:AddLaser(ret,point,direction,queued,forced_end)
 		
 		local dam = SpaceDamage(point, damage)
 		local pawn = Board:GetPawn(point)
-		-- if it's the end of the line (ha), add the laser art -- not pretty
 		if forced_end == point or (Board:IsBuilding(point) and Board:IsShield(point)) or (pawn and pawn:IsShield()) or Board:GetTerrain(point) == TERRAIN_MOUNTAIN or not Board:IsValid(point + DIR_VECTORS[direction]) then
 		--unlike LaserBase's version, this goes through unshielded buildings, but stops on shielded pawns; stil stopped by mountains 
 			if queued then 
@@ -96,4 +111,14 @@ function EVA_RamielBossAtk1:AddLaser(ret,point,direction,queued,forced_end)
 					
 		point = point + DIR_VECTORS[direction]	
 	end
+end
+
+function EVA_RamielBossAtk1:GetSkillEffect(p1,p2)
+	local ret = SkillEffect()
+	local direction = GetDirection(p2 - p1)
+	local target = p1 + DIR_VECTORS[direction]
+	
+	self:AddLaser(ret, target, direction)	--fourth argument should be true
+	
+	return ret
 end
